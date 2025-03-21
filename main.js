@@ -20,9 +20,22 @@ const room = new THREE.Mesh(roomGeometry, roomMaterial);
 scene.add(room);
 
 // Moving light setup
-const light = new THREE.PointLight(0xffffff, 10000);
-light.position.set(0, 2, 3);
+const light = new THREE.PointLight(0xffffff, 30000);
+light.position.set(
+    Math.random() * 100 - 50, // Random X between -50 and 50
+    Math.random() * 80 - 40,  // Random Y between -40 and 40
+    Math.random() * 20 - 10   // Random Z between -10 and 10
+);
 scene.add(light);
+
+// Second moving light
+const light2 = new THREE.PointLight(0xffffff, 30000);
+light2.position.set(
+    -(Math.random() * 100 - 50), // Opposite side X between -50 and 50
+    -(Math.random() * 80 - 40),  // Opposite side Y between -40 and 40
+    Math.random() * 20 + 10      // Random Z between 10 and 30
+);
+scene.add(light2);
 
 // Ambient light for better visibility
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -361,23 +374,38 @@ function animate() {
         ZOOM_SMOOTHNESS
     );
 
-    // Animate light position - always behind camera
-    const lightOffset = 5; // Distance behind camera
+    // Animate light positions - always behind camera
+    const lightOffset = 20; // Distance behind camera
     light.position.z = camera.position.z + lightOffset;
-    // Combine multiple sine waves for more dynamic random-looking movement
+    light2.position.z = camera.position.z + lightOffset + 15; // Slightly further back
+
+    // First light movement - wide pattern but within scene bounds
     light.position.x = 
-        Math.sin(time * 0.2) * 8 + // Larger primary movement range
-        Math.sin(time * 0.1) * 5 + // Larger secondary movement range
-        Math.sin(time * 0.33) * 3 + // More pronounced faster variation
-        Math.sin(time * 0.47) * 2 + // More pronounced complexity
-        Math.sin(time * 0.71) * 1.5; // Added fifth frequency for extra movement
+        Math.sin(time * 0.1) * 30 + // Reduced from 80
+        Math.sin(time * 0.05) * 20 + // Reduced from 60
+        Math.sin(time * 0.15) * 15 + // Reduced from 40
+        Math.sin(time * 0.22) * 10 + // Reduced from 30
+        Math.sin(time * 0.31) * 5;   // Reduced from 20
     light.position.y = 
-        Math.cos(time * 0.15) * 7 + // Larger primary movement range
-        Math.cos(time * 0.08) * 5 + // Larger secondary movement range
-        Math.cos(time * 0.27) * 3 + // More pronounced faster variation
-        Math.cos(time * 0.41) * 2 + // More pronounced complexity
-        Math.cos(time * 0.63) * 1.5 + // Added fifth frequency for extra movement
-        4; // Higher base height offset
+        Math.cos(time * 0.08) * 25 + // Reduced from 70
+        Math.cos(time * 0.04) * 20 + // Reduced from 50
+        Math.cos(time * 0.12) * 15 + // Reduced from 35
+        Math.cos(time * 0.19) * 10 + // Reduced from 25
+        Math.cos(time * 0.27) * 5;   // Reduced from 15
+
+    // Second light movement - different pattern, opposite direction
+    light2.position.x = 
+        -Math.sin(time * 0.17) * 35 + // Reduced from 100
+        -Math.sin(time * 0.09) * 25 + // Reduced from 80
+        -Math.sin(time * 0.25) * 20 + // Reduced from 60
+        -Math.sin(time * 0.33) * 15 + // Reduced from 40
+        -Math.sin(time * 0.41) * 10;  // Reduced from 30
+    light2.position.y = 
+        -Math.cos(time * 0.13) * 30 + // Reduced from 90
+        -Math.cos(time * 0.07) * 25 + // Reduced from 70
+        -Math.cos(time * 0.21) * 20 + // Reduced from 50
+        -Math.cos(time * 0.29) * 15 + // Reduced from 35
+        -Math.cos(time * 0.37) * 10;  // Reduced from 25
 
     // Smooth mouse intersection point movement
     if (isTransitioning) {
