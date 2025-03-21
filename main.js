@@ -1,5 +1,34 @@
 import * as THREE from 'three';
 
+// Add contact information overlay
+const contactInfo = document.createElement('div');
+contactInfo.style.cssText = `
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    color: white;
+    font-family: monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    z-index: 1000;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+    transition: transform 0.1s ease-out;
+`;
+
+contactInfo.innerHTML = `
+    William Thibault<br>
+    Developper<br>
+    <a href="mailto:bonjour@williamthibault.com" style="color: #40E0D0; text-decoration: underline;">bonjour@williamthibault.com</a><br>
+    <a href="tel:+14382383388" style="color: #40E0D0; text-decoration: underline;">+1 438 238 3388</a>
+`;
+
+document.body.appendChild(contactInfo);
+
+// Add variables for contact info parallax
+const CONTACT_PARALLAX_STRENGTH = 15; // Pixels of movement
+let contactInfoX = 20; // Initial left position
+let contactInfoY = 20; // Initial bottom position
+
 // Scene setup
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
@@ -516,6 +545,11 @@ function onMouseMove(event) {
         cubeGroup.worldToLocal(targetIntersectPoint);
         isTransitioning = true;
     }
+
+    // Update contact info position with parallax
+    const parallaxX = (mouse.x * CONTACT_PARALLAX_STRENGTH);
+    const parallaxY = (mouse.y * CONTACT_PARALLAX_STRENGTH);
+    contactInfo.style.transform = `translate(${parallaxX}px, ${-parallaxY}px)`;
 }
 
 window.addEventListener('mousemove', onMouseMove);
