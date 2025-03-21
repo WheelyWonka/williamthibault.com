@@ -9,18 +9,18 @@ document.body.appendChild(renderer.domElement);
 
 // Room setup (gradient background)
 scene.background = new THREE.Color(0xf0f0f0);
-const roomGeometry = new THREE.BoxGeometry(70, 70, 100);
+const roomGeometry = new THREE.BoxGeometry(100, 70, 100);
 const roomMaterial = new THREE.MeshStandardMaterial({
     side: THREE.BackSide,
-    color: 0x333333,
-    metalness: 0.1,
-    roughness: 0.8
+    color: 0x222222,
+    metalness: 1,
+    roughness: 0.6
 });
 const room = new THREE.Mesh(roomGeometry, roomMaterial);
 scene.add(room);
 
 // Moving light setup
-const light = new THREE.PointLight(0xffffff, 5000);
+const light = new THREE.PointLight(0xffffff, 10000);
 light.position.set(0, 2, 3);
 scene.add(light);
 
