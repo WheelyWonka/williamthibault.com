@@ -68,6 +68,11 @@ const SUBCUBE_SIZE = CUBE_SIZE / SEGMENTS;
 const cubeGroup = new THREE.Group();
 const subcubes = [];
 
+// Variables for the alive animation
+const ALIVE_CHANCE = 0.0001; // Keep the same chance
+const MAX_ACTIVE_CUBES = 30;  // Keep the same number of active cubes
+let activeCubes = new Set(); // Track which cubes are currently "alive"
+
 // Custom shader for concrete texture
 const concreteShader = {
     uniforms: {
@@ -307,6 +312,29 @@ for (let x = 0; x < SEGMENTS; x++) {
                 Math.random() * 2 - 1
             );
             
+            // Add alive animation properties
+            cube.userData.isAlive = false;
+            cube.userData.aliveTime = 0;
+            cube.userData.aliveDuration = 0;
+            cube.userData.aliveDirection = new THREE.Vector3();
+            
+            // Determine which face this cube belongs to
+            if (x === 0 || x === SEGMENTS - 1) {
+                // On X face (left or right)
+                cube.userData.isFaceCube = true;
+                cube.userData.faceNormal = new THREE.Vector3(x === 0 ? -1 : 1, 0, 0);
+            } else if (y === 0 || y === SEGMENTS - 1) {
+                // On Y face (top or bottom)
+                cube.userData.isFaceCube = true;
+                cube.userData.faceNormal = new THREE.Vector3(0, y === 0 ? -1 : 1, 0);
+            } else if (z === 0 || z === SEGMENTS - 1) {
+                // On Z face (front or back)
+                cube.userData.isFaceCube = true;
+                cube.userData.faceNormal = new THREE.Vector3(0, 0, z === 0 ? -1 : 1);
+            } else {
+                cube.userData.isFaceCube = false;
+            }
+
             subcubes.push(cube);
             cubeGroup.add(cube);
         }
@@ -427,20 +455,15 @@ function animate() {
     // Animate subcubes
     subcubes.forEach((cube) => {
         if (isHovered) {
-            // Work in local space
+            // Existing hover explosion logic
             const localCubePos = cube.position.clone();
-            
-            // Calculate distance from cube to mouse intersection point in local space
             const distanceToMouse = localCubePos.distanceTo(mouseIntersectPoint);
             const explosionRadius = 7.2;
             
-            // Calculate explosion strength based on distance
             const normalizedDistance = Math.max(0, 1 - (distanceToMouse / explosionRadius));
             const explodeStrength = 12.0 * Math.pow(normalizedDistance, 1.5);
             
-            // Apply explosion only if within radius
             if (distanceToMouse < explosionRadius) {
-                // Calculate direction from intersection point in local space
                 const direction = localCubePos.sub(mouseIntersectPoint).normalize();
                 const targetPosition = new THREE.Vector3(
                     cube.userData.originalPosition.x + direction.x * explodeStrength,
@@ -448,15 +471,71 @@ function animate() {
                     cube.userData.originalPosition.z + direction.z * explodeStrength
                 );
                 
-                // Smooth movement to target position
                 cube.position.lerp(targetPosition, 0.15);
+                
+                // Reset alive state when hovered
+                cube.userData.isAlive = false;
+                activeCubes.delete(cube);
             } else {
-                // Return to original position if outside explosion radius
                 cube.position.lerp(cube.userData.originalPosition, 0.15);
             }
         } else {
-            // Return to original position
-            cube.position.lerp(cube.userData.originalPosition, 0.15);
+            // Handle "alive" animation
+            if (cube.userData.isAlive) {
+                cube.userData.aliveTime += 0.016; // Approximate for 60fps
+                
+                // Calculate movement using a multi-phase animation curve
+                const progress = cube.userData.aliveTime / cube.userData.aliveDuration;
+                let movementCurve;
+                
+                if (progress < 0.2) {
+                    // Quick push out (0-20% of duration) - use custom escape speed
+                    movementCurve = progress * (5.0 * cube.userData.escapeSpeed);
+                } else if (progress < 0.7) {
+                    // Hold and struggle (20-70% of duration) - use custom struggle intensity
+                    const strugglePhase = (progress - 0.15) * 20.0;
+                    movementCurve = 1.0 + Math.sin(strugglePhase) * cube.userData.struggleIntensity;
+                } else {
+                    // Give up and return (70-100% of duration)
+                    const returnPhase = (progress - 0.7) / 0.3;
+                    movementCurve = 1.0 * (1.0 - Math.pow(returnPhase, 2));
+                }
+                
+                const moveAmount = movementCurve * cube.userData.escapeDistance; // Use random escape distance
+                
+                const targetPosition = new THREE.Vector3(
+                    cube.userData.originalPosition.x + cube.userData.faceNormal.x * moveAmount,
+                    cube.userData.originalPosition.y + cube.userData.faceNormal.y * moveAmount,
+                    cube.userData.originalPosition.z + cube.userData.faceNormal.z * moveAmount
+                );
+                
+                // Adjust lerp speed based on phase and escape speed
+                const lerpSpeed = progress < 0.2 ? cube.userData.escapeSpeed : // Fast during push out
+                                progress < 0.7 ? 0.3 : // Medium during hold
+                                0.2;                    // Slower during return
+                
+                cube.position.lerp(targetPosition, lerpSpeed);
+                
+                // End animation if duration is reached
+                if (cube.userData.aliveTime >= cube.userData.aliveDuration) {
+                    cube.userData.isAlive = false;
+                    activeCubes.delete(cube);
+                }
+            } else {
+                // Return to original position if not alive
+                cube.position.lerp(cube.userData.originalPosition, 0.2);
+            }
+
+            if (!cube.userData.isAlive && cube.userData.isFaceCube && activeCubes.size < MAX_ACTIVE_CUBES && Math.random() < ALIVE_CHANCE) {
+                cube.userData.isAlive = true;
+                cube.userData.aliveTime = 0;
+                cube.userData.aliveDuration = Math.random() * 0.5 + 1.2; // 1.2-1.7 seconds
+                // Add random speeds, intensities, and distances for this attempt
+                cube.userData.escapeSpeed = Math.random() * 0.4 + 0.3; // Random speed between 0.3 and 0.7
+                cube.userData.struggleIntensity = Math.random() * 0.04 + 0.01; // Random wobble between 0.01 and 0.05
+                cube.userData.escapeDistance = Math.random() * 0.9 + 0.1; // Random distance between 1.0 and 2.0
+                activeCubes.add(cube);
+            }
         }
     });
 
