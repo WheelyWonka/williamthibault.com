@@ -10,7 +10,8 @@ document.body.appendChild(renderer.domElement);
 // Custom shader for concrete texture
 const concreteShader = {
     uniforms: {
-        time: { value: 0 }
+        time: { value: 0 },
+        variation: { value: 0 }
     },
     vertexShader: `
         varying vec2 vUv;
@@ -25,6 +26,7 @@ const concreteShader = {
         }
     `,
     fragmentShader: `
+        uniform float variation;
         varying vec2 vUv;
         varying vec3 vNormal;
         varying vec3 vPosition;
@@ -63,20 +65,51 @@ const concreteShader = {
             return value;
         }
 
+        vec3 getVariationColor(float v, vec2 st, float n, float imp) {
+            // Base colors for each variation
+            vec3 colors[6] = vec3[6](
+                vec3(0.267, 0.267, 0.267),  // Classic grey
+                vec3(0.25, 0.23, 0.21),     // Brownish
+                vec3(0.28, 0.28, 0.30),     // Bluish grey
+                vec3(0.22, 0.24, 0.23),     // Greenish
+                vec3(0.29, 0.27, 0.25),     // Warm grey
+                vec3(0.24, 0.25, 0.27)      // Cool grey
+            );
+
+            // Pattern variations
+            float patterns[6] = float[6](
+                n * 0.15,                    // Standard noise
+                n * 0.2 + sin(st.x*10.0) * 0.05,  // Striated
+                n * 0.12 + fbm(st*2.0) * 0.08,    // Double noise
+                n * 0.18 + cos(st.y*8.0) * 0.04,  // Horizontal lines
+                n * 0.15 + sin(st.x*6.0 + st.y*6.0) * 0.06, // Diagonal pattern
+                n * 0.1 + fbm(st*3.0) * 0.1       // Heavy noise
+            );
+
+            vec3 baseColor = colors[int(v)];
+            float pattern = patterns[int(v)];
+            
+            // Add variation-specific imperfections
+            float imperfectionStrength[6] = float[6](
+                0.1, 0.15, 0.08, 0.12, 0.14, 0.11
+            );
+            
+            vec3 color = baseColor + vec3(pattern - 0.075);
+            color += vec3(imp * imperfectionStrength[int(v)]);
+            
+            return color;
+        }
+
         void main() {
             // Create base concrete texture
             vec2 st = vUv * 8.0; // Scale UV for more detail
             float n = fbm(st);
+            float imp = fbm(st * 4.0);
             
-            // Add some variation to the base color
-            vec3 baseColor = vec3(0.267, 0.267, 0.267); // 0x444444
-            vec3 color = baseColor + vec3(n * 0.15 - 0.075);
+            // Get color based on variation
+            vec3 color = getVariationColor(variation, st, n, imp);
             
-            // Add small imperfections
-            float imperfections = fbm(st * 4.0) * 0.1;
-            color += vec3(imperfections);
-
-            // Add some edge darkening
+            // Add edge darkening
             float edgeEffect = pow(1.0 - abs(dot(vNormal, vec3(0.0, 0.0, 1.0))), 0.5) * 0.3;
             color = mix(color, color * 0.8, edgeEffect);
 
@@ -123,86 +156,46 @@ for (let x = 0; x < SEGMENTS; x++) {
                 specular: 0x000000
             });
 
+            // Enable UV coordinates in the material
+            material.defines = {
+                USE_UV: ''
+            };
+
             // Add custom shader modifications
             material.onBeforeCompile = (shader) => {
-                shader.uniforms.time = concreteShader.uniforms.time;
-
-                // Add only the varyings we need that aren't already in Three.js
-                const varyingDecl = `
-                varying vec2 vUv;
-                varying vec3 vPosition;
-                `;
-
-                shader.vertexShader = varyingDecl + shader.vertexShader;
-                shader.fragmentShader = varyingDecl + shader.fragmentShader;
+                // Add uniforms
+                shader.uniforms.variation = { value: Math.floor(Math.random() * 6) };
                 
-                // Add UV assignment in vertex shader (normal is already handled by Three.js)
-                shader.vertexShader = shader.vertexShader.replace(
-                    '#include <beginnormal_vertex>',
-                    '#include <beginnormal_vertex>\nvUv = uv;\nvPosition = position;'
-                );
-
-                // Add our noise functions and modify the fragment shader
+                // Add our custom functions before main
+                const customFunctions = concreteShader.fragmentShader
+                    .split('void main() {')[0]
+                    .replace(/uniform float variation;[\s\S]*?varying vec3 vPosition;/, '');
+                
                 shader.fragmentShader = shader.fragmentShader.replace(
                     'void main() {',
                     `
-                    // Noise functions
-                    float random(vec2 st) {
-                        return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
-                    }
-
-                    float noise(vec2 st) {
-                        vec2 i = floor(st);
-                        vec2 f = fract(st);
-
-                        float a = random(i);
-                        float b = random(i + vec2(1.0, 0.0));
-                        float c = random(i + vec2(0.0, 1.0));
-                        float d = random(i + vec2(1.0, 1.0));
-
-                        vec2 u = f * f * (3.0 - 2.0 * f);
-
-                        return mix(a, b, u.x) +
-                                (c - a)* u.y * (1.0 - u.x) +
-                                (d - b) * u.x * u.y;
-                    }
-
-                    float fbm(vec2 st) {
-                        float value = 0.0;
-                        float amplitude = 0.5;
-                        float frequency = 0.0;
-                        
-                        for(int i = 0; i < 5; i++) {
-                            value += amplitude * noise(st);
-                            st *= 2.0;
-                            amplitude *= 0.5;
-                        }
-                        return value;
-                    }
-
+                    uniform float variation;
+                    ${customFunctions}
                     void main() {
-                `
+                    `
                 );
 
-                // Add concrete texture calculation before the first diffuse color usage
+                // Replace the color calculation
                 shader.fragmentShader = shader.fragmentShader.replace(
                     '#include <color_fragment>',
                     `
                     #include <color_fragment>
-                    
-                    // Create concrete texture
-                    vec2 st = vUv * 8.0;
-                    float n = fbm(st);
-                    
-                    // Add some variation to the base color
-                    vec3 baseColor = vec3(0.267, 0.267, 0.267);
-                    vec3 concreteColor = baseColor + vec3(n * 0.15 - 0.075);
-                    
-                    // Add small imperfections
-                    float imperfections = fbm(st * 4.0) * 0.1;
-                    concreteColor += vec3(imperfections);
-                    
-                    diffuseColor.rgb *= concreteColor;
+                    #if defined( USE_UV )
+                        vec2 st = vUv.xy * 8.0;
+                        float n = fbm(st);
+                        float imp = fbm(st * 4.0);
+                        vec3 concreteColor = getVariationColor(variation, st, n, imp);
+                        
+                        float edgeEffect = pow(1.0 - abs(dot(normalize(vNormal), vec3(0.0, 0.0, 1.0))), 0.5) * 0.3;
+                        concreteColor = mix(concreteColor, concreteColor * 0.8, edgeEffect);
+                        
+                        diffuseColor.rgb *= concreteColor;
+                    #endif
                     `
                 );
             };
