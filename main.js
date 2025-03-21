@@ -7,29 +7,50 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
+// Moving light setup
+const light = new THREE.PointLight(0xffffff, 5000);
+light.position.set(0, 2, 5);
+scene.add(light);
+
+// Ambient light for better visibility
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+scene.add(ambientLight);
+
+// Define cube size constant first
+const CUBE_SIZE = 12;
+
+// Create main cube composed of smaller cubes
+const SEGMENTS = 8;
+const SUBCUBE_SIZE = CUBE_SIZE / SEGMENTS;
+const cubeGroup = new THREE.Group();
+const subcubes = [];
+
 // Custom shader for concrete texture
 const concreteShader = {
     uniforms: {
         time: { value: 0 },
-        variation: { value: 0 }
+        variation: { value: 0 },
+        cubeSize: { value: CUBE_SIZE }
     },
     vertexShader: `
         varying vec2 vUv;
         varying vec3 vNormal;
-        varying vec3 vPosition;
+        varying vec3 vWorldPosition;
 
         void main() {
             vUv = uv;
             vNormal = normalize(normalMatrix * normal);
-            vPosition = position;
+            vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+            vWorldPosition = worldPosition.xyz;
             gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }
     `,
     fragmentShader: `
         uniform float variation;
+        uniform float cubeSize;
         varying vec2 vUv;
         varying vec3 vNormal;
-        varying vec3 vPosition;
+        varying vec3 vWorldPosition;
 
         // Noise functions
         float random(vec2 st) {
@@ -95,9 +116,9 @@ const concreteShader = {
                 vec3(0.053, 0.053, 0.053)   // Dark grey 24
             );
 
-            // Pattern variations (24 variations) - only organic concrete-like textures
+            // Pattern variations modified for seamless transition
             float patterns[24] = float[24](
-                // All patterns modified to be organic, no stripes or geometric patterns
+                // All patterns modified to be organic and seamless
                 n * 0.15 + fbm(st*2.0) * 0.08,    // Basic concrete
                 n * 0.12 + fbm(st*3.0) * 0.1,     // Rough concrete
                 n * 0.14 + fbm(st*2.5) * 0.09,    // Medium concrete
@@ -142,13 +163,12 @@ const concreteShader = {
         }
 
         void main() {
-            // Create base concrete texture
-            vec2 st = vUv * 8.0; // Scale UV for more detail
-            float n = fbm(st);
-            float imp = fbm(st * 4.0);
+            // Use world position for seamless texturing
+            vec2 globalSt = vWorldPosition.xy / cubeSize * 8.0;
+            float n = fbm(globalSt);
+            float imp = fbm(globalSt * 4.0);
             
-            // Get color based on variation
-            vec3 color = getVariationColor(variation, st, n, imp);
+            vec3 color = getVariationColor(variation, globalSt, n, imp);
             
             // Add edge darkening
             float edgeEffect = pow(1.0 - abs(dot(vNormal, vec3(0.0, 0.0, 1.0))), 0.5) * 0.3;
@@ -158,34 +178,6 @@ const concreteShader = {
         }
     `
 };
-
-// Room setup (gradient background)
-scene.background = new THREE.Color(0xf0f0f0);
-const roomGeometry = new THREE.BoxGeometry(70, 70, 100);
-const roomMaterial = new THREE.MeshStandardMaterial({
-    side: THREE.BackSide,
-    color: 0x333333,
-    metalness: 0.1,
-    roughness: 0.8
-});
-const room = new THREE.Mesh(roomGeometry, roomMaterial);
-scene.add(room);
-
-// Moving light setup
-const light = new THREE.PointLight(0xffffff, 5000);
-light.position.set(0, 2, 5);
-scene.add(light);
-
-// Ambient light for better visibility
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-scene.add(ambientLight);
-
-// Create main cube composed of smaller cubes
-const CUBE_SIZE = 12;
-const SEGMENTS = 8;
-const SUBCUBE_SIZE = CUBE_SIZE / SEGMENTS;
-const cubeGroup = new THREE.Group();
-const subcubes = [];
 
 for (let x = 0; x < SEGMENTS; x++) {
     for (let y = 0; y < SEGMENTS; y++) {
@@ -206,19 +198,35 @@ for (let x = 0; x < SEGMENTS; x++) {
             material.onBeforeCompile = (shader) => {
                 // Add uniforms
                 shader.uniforms.variation = { value: Math.floor(Math.random() * 24) };
+                shader.uniforms.cubeSize = { value: CUBE_SIZE };
                 
                 // Add our custom functions before main
                 const customFunctions = concreteShader.fragmentShader
                     .split('void main() {')[0]
-                    .replace(/uniform float variation;[\s\S]*?varying vec3 vPosition;/, '');
+                    .replace(/uniform float variation;[\s\S]*?varying vec3 vWorldPosition;/, '');
                 
+                // Add vWorldPosition to vertex shader declarations
+                shader.vertexShader = shader.vertexShader.replace(
+                    '#include <common>',
+                    '#include <common>\nvarying vec3 vWorldPosition;'
+                );
+
+                // Add world position calculation to vertex shader
+                shader.vertexShader = shader.vertexShader.replace(
+                    '#include <begin_vertex>',
+                    `#include <begin_vertex>
+                    vec4 worldPosition = modelMatrix * vec4( position, 1.0 );
+                    vWorldPosition = worldPosition.xyz;`
+                );
+                
+                // Add varyings and uniforms to fragment shader
                 shader.fragmentShader = shader.fragmentShader.replace(
-                    'void main() {',
-                    `
+                    '#include <common>',
+                    `#include <common>
                     uniform float variation;
-                    ${customFunctions}
-                    void main() {
-                    `
+                    uniform float cubeSize;
+                    varying vec3 vWorldPosition;
+                    ${customFunctions}`
                 );
 
                 // Replace the color calculation
@@ -226,17 +234,15 @@ for (let x = 0; x < SEGMENTS; x++) {
                     '#include <color_fragment>',
                     `
                     #include <color_fragment>
-                    #if defined( USE_UV )
-                        vec2 st = vUv.xy * 8.0;
-                        float n = fbm(st);
-                        float imp = fbm(st * 4.0);
-                        vec3 concreteColor = getVariationColor(variation, st, n, imp);
-                        
-                        float edgeEffect = pow(1.0 - abs(dot(normalize(vNormal), vec3(0.0, 0.0, 1.0))), 0.5) * 0.3;
-                        concreteColor = mix(concreteColor, concreteColor * 0.8, edgeEffect);
-                        
-                        diffuseColor.rgb *= concreteColor;
-                    #endif
+                    vec2 globalSt = vWorldPosition.xy / cubeSize * 8.0;
+                    float n = fbm(globalSt);
+                    float imp = fbm(globalSt * 4.0);
+                    vec3 concreteColor = getVariationColor(variation, globalSt, n, imp);
+                    
+                    float edgeEffect = pow(1.0 - abs(dot(normalize(vNormal), vec3(0.0, 0.0, 1.0))), 0.5) * 0.3;
+                    concreteColor = mix(concreteColor, concreteColor * 0.8, edgeEffect);
+                    
+                    diffuseColor.rgb *= concreteColor;
                     `
                 );
             };
@@ -266,6 +272,9 @@ for (let x = 0; x < SEGMENTS; x++) {
 
 scene.add(cubeGroup);
 camera.position.z = 20;
+
+// Room setup (gradient background)
+scene.background = new THREE.Color(0xf0f0f0);
 
 // Cube position limits and zoom settings
 const MIN_DISTANCE = 0.001;
