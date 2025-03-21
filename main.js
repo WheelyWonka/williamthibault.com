@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 // Scene setup
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
@@ -87,10 +87,10 @@ const concreteShader = {
 
 // Room setup (gradient background)
 scene.background = new THREE.Color(0xf0f0f0);
-const roomGeometry = new THREE.BoxGeometry(20, 20, 20);
+const roomGeometry = new THREE.BoxGeometry(70, 70, 100);
 const roomMaterial = new THREE.MeshStandardMaterial({
     side: THREE.BackSide,
-    color: 0xe0e0e0,
+    color: 0x333333,
     metalness: 0.1,
     roughness: 0.8
 });
@@ -98,7 +98,7 @@ const room = new THREE.Mesh(roomGeometry, roomMaterial);
 scene.add(room);
 
 // Moving light setup
-const light = new THREE.PointLight(0xffffff, 100);
+const light = new THREE.PointLight(0xffffff, 5000);
 light.position.set(0, 2, 5);
 scene.add(light);
 
@@ -107,7 +107,7 @@ const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
 scene.add(ambientLight);
 
 // Create main cube composed of smaller cubes
-const CUBE_SIZE = 2;
+const CUBE_SIZE = 12;
 const SEGMENTS = 8;
 const SUBCUBE_SIZE = CUBE_SIZE / SEGMENTS;
 const cubeGroup = new THREE.Group();
@@ -231,7 +231,29 @@ for (let x = 0; x < SEGMENTS; x++) {
 }
 
 scene.add(cubeGroup);
-camera.position.z = 8;
+camera.position.z = 20;
+
+// Cube position limits and zoom settings
+const MIN_DISTANCE = 0.001;
+const MAX_DISTANCE = 30;
+const ZOOM_SPEED = 1;
+const ZOOM_SMOOTHNESS = 0.08;
+let targetZPosition = -15;
+cubeGroup.position.z = -15;
+
+// Mouse wheel zoom
+function onMouseWheel(event) {
+    // Normalize wheel delta
+    const delta = Math.sign(event.deltaY);
+    
+    // Update target position with variable speed based on distance
+    const currentDistance = -targetZPosition;
+    const speedMultiplier = currentDistance < 1 ? 0.1 : 0.3; // Slower speed when very close
+    const newDistance = currentDistance + delta * ZOOM_SPEED * speedMultiplier;
+    targetZPosition = -Math.max(MIN_DISTANCE, Math.min(MAX_DISTANCE, newDistance));
+}
+
+window.addEventListener('wheel', onMouseWheel);
 
 // Raycaster for mouse interaction
 const raycaster = new THREE.Raycaster();
@@ -280,10 +302,18 @@ function animate() {
     requestAnimationFrame(animate);
     time += 0.01;
 
-    // Animate light position
-    light.position.x = Math.sin(time * 0.5) * 3;
-    light.position.y = Math.cos(time * 0.3) * 2 + 2;
-    light.position.z = Math.cos(time * 0.4) * 3 + 5;
+    // Smooth zoom interpolation
+    cubeGroup.position.z = THREE.MathUtils.lerp(
+        cubeGroup.position.z,
+        targetZPosition,
+        ZOOM_SMOOTHNESS
+    );
+
+    // Animate light position - always behind camera
+    const lightOffset = 5; // Distance behind camera
+    light.position.z = camera.position.z + lightOffset;
+    light.position.x = Math.sin(time * 0.5) * 4;
+    light.position.y = Math.cos(time * 0.3) * 3 + 2;
 
     // Smooth mouse intersection point movement
     if (isTransitioning) {
@@ -304,11 +334,11 @@ function animate() {
             
             // Calculate distance from cube to mouse intersection point in local space
             const distanceToMouse = localCubePos.distanceTo(mouseIntersectPoint);
-            const explosionRadius = 1.2;
+            const explosionRadius = 7.2;
             
             // Calculate explosion strength based on distance
             const normalizedDistance = Math.max(0, 1 - (distanceToMouse / explosionRadius));
-            const explodeStrength = 2.0 * Math.pow(normalizedDistance, 1.5);
+            const explodeStrength = 12.0 * Math.pow(normalizedDistance, 1.5);
             
             // Apply explosion only if within radius
             if (distanceToMouse < explosionRadius) {
