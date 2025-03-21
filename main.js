@@ -444,6 +444,13 @@ for (let x = 0; x < SEGMENTS; x++) {
 scene.add(cubeGroup);
 camera.position.z = 20;
 
+// Add camera parallax variables
+const PARALLAX_STRENGTH = 0.07; // Very subtle rotation
+let targetCameraRotationX = 0;
+let targetCameraRotationY = 0;
+let currentCameraRotationX = 0;
+let currentCameraRotationY = 0;
+
 // Cube position limits and zoom settings
 const MIN_DISTANCE = 0.001;
 const MAX_DISTANCE = 30;
@@ -480,6 +487,10 @@ function onMouseMove(event) {
     // Update normalized mouse coordinates
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    
+    // Update camera rotation targets based on mouse position
+    targetCameraRotationY = mouse.x * PARALLAX_STRENGTH;
+    targetCameraRotationX = -mouse.y * PARALLAX_STRENGTH;
     
     // Update shader uniform for all subcubes
     subcubes.forEach((cube) => {
@@ -525,6 +536,13 @@ function animate() {
         targetZPosition,
         ZOOM_SMOOTHNESS
     );
+
+    // Smooth camera rotation interpolation
+    currentCameraRotationX = THREE.MathUtils.lerp(currentCameraRotationX, targetCameraRotationX, 0.05);
+    currentCameraRotationY = THREE.MathUtils.lerp(currentCameraRotationY, targetCameraRotationY, 0.05);
+    
+    camera.rotation.x = currentCameraRotationX;
+    camera.rotation.y = currentCameraRotationY;
 
     // Animate light positions with random patterns
     const lightOffset = 20;
