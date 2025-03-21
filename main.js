@@ -69,9 +69,12 @@ const cubeGroup = new THREE.Group();
 const subcubes = [];
 
 // Variables for the alive animation
-const ALIVE_CHANCE = 0.0001; // Keep the same chance
-const MAX_ACTIVE_CUBES = 30;  // Keep the same number of active cubes
-let activeCubes = new Set(); // Track which cubes are currently "alive"
+const ALIVE_CHANCE = 1.0;
+const MAX_ACTIVE_CUBES = 512;
+let activeCubes = new Set();
+let heartbeatTime = 0;
+let currentCycleDuration = 3.0;
+let nextCycleDuration = 3.0;
 
 // Custom shader for concrete texture
 const concreteShader = {
@@ -576,6 +579,28 @@ function animate() {
         cubeGroup.rotation.y += 0.002;
     }
 
+    // Update heartbeat timing
+    heartbeatTime += 0.016;
+    
+    // Check if we need to generate a new cycle duration
+    if (heartbeatTime >= currentCycleDuration) {
+        heartbeatTime = 0;
+        currentCycleDuration = nextCycleDuration;
+        nextCycleDuration = 3; // Random duration between 3.5 and 5 seconds
+    }
+    
+    const heartbeatPhase = heartbeatTime / currentCycleDuration;
+    
+    // Two distinct beats per cycle (lub-dub)
+    const firstBeatTime = 0.2;
+    const secondBeatTime = 0.27; // Closer to first beat
+    const beatWidth = 0.013; // Sharper beats
+    
+    // Calculate beat strengths using sharper curves
+    const firstBeat = Math.pow(Math.max(0, 1 - Math.abs(heartbeatPhase - firstBeatTime) / beatWidth), 4);
+    const secondBeat = Math.pow(Math.max(0, 1 - Math.abs(heartbeatPhase - secondBeatTime) / beatWidth), 4) * 0.8; // Slightly weaker second beat
+    const heartbeatStrength = Math.max(firstBeat, secondBeat);
+
     // Animate subcubes
     subcubes.forEach((cube) => {
         if (isHovered) {
@@ -606,58 +631,47 @@ function animate() {
         } else {
             // Handle "alive" animation
             if (cube.userData.isAlive) {
-                cube.userData.aliveTime += 0.016; // Approximate for 60fps
+                cube.userData.aliveTime += 0.016;
                 
-                // Calculate movement using a multi-phase animation curve
-                const progress = cube.userData.aliveTime / cube.userData.aliveDuration;
-                let movementCurve;
+                // Calculate direction from center
+                const directionFromCenter = cube.userData.originalPosition.clone().normalize();
                 
-                if (progress < 0.2) {
-                    // Quick push out (0-20% of duration) - use custom escape speed
-                    movementCurve = progress * (5.0 * cube.userData.escapeSpeed);
-                } else if (progress < 0.7) {
-                    // Hold and struggle (20-70% of duration) - use custom struggle intensity
-                    const strugglePhase = (progress - 0.15) * 20.0;
-                    movementCurve = 1.0 + Math.sin(strugglePhase) * cube.userData.struggleIntensity;
-                } else {
-                    // Give up and return (70-100% of duration)
-                    const returnPhase = (progress - 0.7) / 0.3;
-                    movementCurve = 1.0 * (1.0 - Math.pow(returnPhase, 2));
-                }
+                // Base movement amount on distance from center with random variation
+                const distanceFromCenter = cube.userData.originalPosition.length();
+                const normalizedDistance = distanceFromCenter / (CUBE_SIZE * 0.5);
                 
-                const moveAmount = movementCurve * cube.userData.escapeDistance; // Use random escape distance
+                // Use the cube's random offset for consistent variation
+                const randomFactor = 0.7 + cube.userData.randomOffset.x * 0.6; // Range: 0.1 to 1.3
+                
+                // Combine base movement with random variation
+                const moveAmount = 0.4 * heartbeatStrength * normalizedDistance * randomFactor;
                 
                 const targetPosition = new THREE.Vector3(
-                    cube.userData.originalPosition.x + cube.userData.faceNormal.x * moveAmount,
-                    cube.userData.originalPosition.y + cube.userData.faceNormal.y * moveAmount,
-                    cube.userData.originalPosition.z + cube.userData.faceNormal.z * moveAmount
+                    cube.userData.originalPosition.x * (1 + moveAmount),
+                    cube.userData.originalPosition.y * (1 + moveAmount),
+                    cube.userData.originalPosition.z * (1 + moveAmount)
                 );
                 
-                // Adjust lerp speed based on phase and escape speed
-                const lerpSpeed = progress < 0.2 ? cube.userData.escapeSpeed : // Fast during push out
-                                progress < 0.7 ? 0.3 : // Medium during hold
-                                0.2;                    // Slower during return
+                // Quick outward movement, slower return
+                const lerpSpeed = heartbeatStrength > 0.1 ? 
+                    0.5 + cube.userData.randomOffset.y * 0.2 : // Random variation in outward speed
+                    0.15 + cube.userData.randomOffset.z * 0.05; // Random variation in return speed
                 
                 cube.position.lerp(targetPosition, lerpSpeed);
                 
-                // End animation if duration is reached
-                if (cube.userData.aliveTime >= cube.userData.aliveDuration) {
-                    cube.userData.isAlive = false;
-                    activeCubes.delete(cube);
+                // Keep alive until next cycle
+                if (cube.userData.aliveTime >= currentCycleDuration) {
+                    cube.userData.aliveTime = 0;
                 }
             } else {
-                // Return to original position if not alive
-                cube.position.lerp(cube.userData.originalPosition, 0.2);
+                // Return to original position
+                cube.position.lerp(cube.userData.originalPosition, 0.15);
             }
 
-            if (!cube.userData.isAlive && cube.userData.isFaceCube && activeCubes.size < MAX_ACTIVE_CUBES && Math.random() < ALIVE_CHANCE) {
+            // Activate all cubes for unified beating
+            if (!cube.userData.isAlive && activeCubes.size < MAX_ACTIVE_CUBES) {
                 cube.userData.isAlive = true;
                 cube.userData.aliveTime = 0;
-                cube.userData.aliveDuration = Math.random() * 0.5 + 1.2; // 1.2-1.7 seconds
-                // Add random speeds, intensities, and distances for this attempt
-                cube.userData.escapeSpeed = Math.random() * 0.4 + 0.3; // Random speed between 0.3 and 0.7
-                cube.userData.struggleIntensity = Math.random() * 0.04 + 0.01; // Random wobble between 0.01 and 0.05
-                cube.userData.escapeDistance = Math.random() * 0.9 + 0.1; // Random distance between 1.0 and 2.0
                 activeCubes.add(cube);
             }
         }
