@@ -7,6 +7,84 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
+// Custom shader for concrete texture
+const concreteShader = {
+    uniforms: {
+        time: { value: 0 }
+    },
+    vertexShader: `
+        varying vec2 vUv;
+        varying vec3 vNormal;
+        varying vec3 vPosition;
+
+        void main() {
+            vUv = uv;
+            vNormal = normalize(normalMatrix * normal);
+            vPosition = position;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+    `,
+    fragmentShader: `
+        varying vec2 vUv;
+        varying vec3 vNormal;
+        varying vec3 vPosition;
+
+        // Noise functions
+        float random(vec2 st) {
+            return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
+        }
+
+        float noise(vec2 st) {
+            vec2 i = floor(st);
+            vec2 f = fract(st);
+
+            float a = random(i);
+            float b = random(i + vec2(1.0, 0.0));
+            float c = random(i + vec2(0.0, 1.0));
+            float d = random(i + vec2(1.0, 1.0));
+
+            vec2 u = f * f * (3.0 - 2.0 * f);
+
+            return mix(a, b, u.x) +
+                    (c - a)* u.y * (1.0 - u.x) +
+                    (d - b) * u.x * u.y;
+        }
+
+        float fbm(vec2 st) {
+            float value = 0.0;
+            float amplitude = 0.5;
+            float frequency = 0.0;
+            
+            for(int i = 0; i < 5; i++) {
+                value += amplitude * noise(st);
+                st *= 2.0;
+                amplitude *= 0.5;
+            }
+            return value;
+        }
+
+        void main() {
+            // Create base concrete texture
+            vec2 st = vUv * 8.0; // Scale UV for more detail
+            float n = fbm(st);
+            
+            // Add some variation to the base color
+            vec3 baseColor = vec3(0.267, 0.267, 0.267); // 0x444444
+            vec3 color = baseColor + vec3(n * 0.15 - 0.075);
+            
+            // Add small imperfections
+            float imperfections = fbm(st * 4.0) * 0.1;
+            color += vec3(imperfections);
+
+            // Add some edge darkening
+            float edgeEffect = pow(1.0 - abs(dot(vNormal, vec3(0.0, 0.0, 1.0))), 0.5) * 0.3;
+            color = mix(color, color * 0.8, edgeEffect);
+
+            gl_FragColor = vec4(color, 1.0);
+        }
+    `
+};
+
 // Room setup (gradient background)
 scene.background = new THREE.Color(0xf0f0f0);
 const roomGeometry = new THREE.BoxGeometry(20, 20, 20);
@@ -39,11 +117,96 @@ for (let x = 0; x < SEGMENTS; x++) {
     for (let y = 0; y < SEGMENTS; y++) {
         for (let z = 0; z < SEGMENTS; z++) {
             const geometry = new THREE.BoxGeometry(SUBCUBE_SIZE, SUBCUBE_SIZE, SUBCUBE_SIZE);
-            const material = new THREE.MeshStandardMaterial({ 
+            const material = new THREE.MeshPhongMaterial({
                 color: 0x444444,
-                metalness: 0.5,
-                roughness: 0.5
+                shininess: 0,
+                specular: 0x000000
             });
+
+            // Add custom shader modifications
+            material.onBeforeCompile = (shader) => {
+                shader.uniforms.time = concreteShader.uniforms.time;
+
+                // Add only the varyings we need that aren't already in Three.js
+                const varyingDecl = `
+                varying vec2 vUv;
+                varying vec3 vPosition;
+                `;
+
+                shader.vertexShader = varyingDecl + shader.vertexShader;
+                shader.fragmentShader = varyingDecl + shader.fragmentShader;
+                
+                // Add UV assignment in vertex shader (normal is already handled by Three.js)
+                shader.vertexShader = shader.vertexShader.replace(
+                    '#include <beginnormal_vertex>',
+                    '#include <beginnormal_vertex>\nvUv = uv;\nvPosition = position;'
+                );
+
+                // Add our noise functions and modify the fragment shader
+                shader.fragmentShader = shader.fragmentShader.replace(
+                    'void main() {',
+                    `
+                    // Noise functions
+                    float random(vec2 st) {
+                        return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
+                    }
+
+                    float noise(vec2 st) {
+                        vec2 i = floor(st);
+                        vec2 f = fract(st);
+
+                        float a = random(i);
+                        float b = random(i + vec2(1.0, 0.0));
+                        float c = random(i + vec2(0.0, 1.0));
+                        float d = random(i + vec2(1.0, 1.0));
+
+                        vec2 u = f * f * (3.0 - 2.0 * f);
+
+                        return mix(a, b, u.x) +
+                                (c - a)* u.y * (1.0 - u.x) +
+                                (d - b) * u.x * u.y;
+                    }
+
+                    float fbm(vec2 st) {
+                        float value = 0.0;
+                        float amplitude = 0.5;
+                        float frequency = 0.0;
+                        
+                        for(int i = 0; i < 5; i++) {
+                            value += amplitude * noise(st);
+                            st *= 2.0;
+                            amplitude *= 0.5;
+                        }
+                        return value;
+                    }
+
+                    void main() {
+                `
+                );
+
+                // Add concrete texture calculation before the first diffuse color usage
+                shader.fragmentShader = shader.fragmentShader.replace(
+                    '#include <color_fragment>',
+                    `
+                    #include <color_fragment>
+                    
+                    // Create concrete texture
+                    vec2 st = vUv * 8.0;
+                    float n = fbm(st);
+                    
+                    // Add some variation to the base color
+                    vec3 baseColor = vec3(0.267, 0.267, 0.267);
+                    vec3 concreteColor = baseColor + vec3(n * 0.15 - 0.075);
+                    
+                    // Add small imperfections
+                    float imperfections = fbm(st * 4.0) * 0.1;
+                    concreteColor += vec3(imperfections);
+                    
+                    diffuseColor.rgb *= concreteColor;
+                    `
+                );
+            };
+
             const cube = new THREE.Mesh(geometry, material);
             
             // Position each subcube
