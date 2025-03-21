@@ -78,7 +78,8 @@ const concreteShader = {
     uniforms: {
         time: { value: 0 },
         variation: { value: 0 },
-        cubeSize: { value: CUBE_SIZE }
+        cubeSize: { value: CUBE_SIZE },
+        mousePos: { value: new THREE.Vector2(0, 0) }  // Add mouse position uniform
     },
     vertexShader: `
         varying vec2 vUv;
@@ -94,8 +95,10 @@ const concreteShader = {
         }
     `,
     fragmentShader: `
+        uniform float time;
         uniform float variation;
         uniform float cubeSize;
+        uniform vec2 mousePos;  // Add mouse position uniform
         varying vec2 vUv;
         varying vec3 vNormal;
         varying vec3 vWorldPosition;
@@ -121,13 +124,32 @@ const concreteShader = {
                     (d - b) * u.x * u.y;
         }
 
+        // Modified flow noise function to incorporate mouse influence
+        vec2 flowNoise(vec2 st, float t) {
+            // Base flow
+            float angle1 = noise(st + t * 0.1) * 6.28318;
+            float angle2 = noise(st * 1.5 - t * 0.15) * 6.28318;
+            
+            vec2 flow1 = vec2(cos(angle1), sin(angle1));
+            vec2 flow2 = vec2(cos(angle2), sin(angle2));
+            
+            // Mouse influence
+            vec2 mouseFlow = (mousePos - st) * 0.02; // Subtle mouse influence
+            
+            return flow1 * 0.3 + flow2 * 0.2 + mouseFlow;
+        }
+
         float fbm(vec2 st) {
             float value = 0.0;
             float amplitude = 0.5;
             float frequency = 0.0;
             
+            // Add flow-based movement to each octave
+            vec2 flow = flowNoise(st * 0.5, time);
+            
             for(int i = 0; i < 5; i++) {
-                value += amplitude * noise(st);
+                vec2 flowedSt = st + flow * (float(i) * 0.1);
+                value += amplitude * noise(flowedSt);
                 st *= 2.0;
                 amplitude *= 0.5;
             }
@@ -164,41 +186,44 @@ const concreteShader = {
                 vec3(0.053, 0.053, 0.053)   // Dark grey 24
             );
 
-            // Pattern variations modified for seamless transition
+            // Add time-based movement to the texture coordinates
+            vec2 flow = flowNoise(st, time);
+            st += flow * 0.2;
+            
+            // Pattern variations with movement
             float patterns[24] = float[24](
-                // All patterns modified to be organic and seamless
-                n * 0.15 + fbm(st*2.0) * 0.08,    // Basic concrete
-                n * 0.12 + fbm(st*3.0) * 0.1,     // Rough concrete
-                n * 0.14 + fbm(st*2.5) * 0.09,    // Medium concrete
-                n * 0.16 + fbm(st*3.5) * 0.07,    // Coarse concrete
-                n * 0.13 + fbm(st*4.0) * 0.06,    // Fine concrete
-                n * 0.17 + fbm(st*2.8) * 0.08,    // Porous concrete
-                n * 0.11 + fbm(st*3.2) * 0.09,    // Dense concrete
-                n * 0.15 + fbm(st*2.6) * 0.07,    // Smooth concrete
-                n * 0.14 + fbm(st*3.8) * 0.06,    // Weathered concrete
-                n * 0.16 + fbm(st*2.4) * 0.08,    // Aged concrete
-                n * 0.13 + fbm(st*3.4) * 0.07,    // Textured concrete
-                n * 0.15 + fbm(st*2.9) * 0.09,    // Grainy concrete
-                n * 0.12 + fbm(st*3.6) * 0.08,    // Mottled concrete
-                n * 0.16 + fbm(st*2.7) * 0.07,    // Speckled concrete
-                n * 0.14 + fbm(st*3.3) * 0.06,    // Eroded concrete
-                n * 0.13 + fbm(st*2.8) * 0.08,    // Pitted concrete
-                n * 0.15 + fbm(st*3.7) * 0.07,    // Worn concrete
-                n * 0.12 + fbm(st*2.5) * 0.09,    // Raw concrete
-                n * 0.16 + fbm(st*3.1) * 0.08,    // Natural concrete
-                n * 0.14 + fbm(st*2.9) * 0.07,    // Organic concrete
-                n * 0.13 + fbm(st*3.5) * 0.06,    // Uneven concrete
-                n * 0.15 + fbm(st*2.6) * 0.08,    // Distressed concrete
-                n * 0.12 + fbm(st*3.2) * 0.07,    // Irregular concrete
-                n * 0.16 + fbm(st*2.8) * 0.09     // Rough-hewn concrete
+                n * 0.15 + fbm(st*2.0 + sin(time * 0.2) * 0.1) * 0.08,
+                n * 0.12 + fbm(st*3.0 + cos(time * 0.15) * 0.1) * 0.1,
+                n * 0.14 + fbm(st*2.5 + sin(time * 0.25) * 0.1) * 0.09,
+                n * 0.16 + fbm(st*3.5 + cos(time * 0.18) * 0.1) * 0.07,
+                n * 0.13 + fbm(st*4.0 + sin(time * 0.22) * 0.1) * 0.06,
+                n * 0.17 + fbm(st*2.8 + cos(time * 0.2) * 0.1) * 0.08,
+                n * 0.11 + fbm(st*3.2 + sin(time * 0.17) * 0.1) * 0.09,
+                n * 0.15 + fbm(st*2.6 + cos(time * 0.23) * 0.1) * 0.07,
+                n * 0.14 + fbm(st*3.8 + sin(time * 0.19) * 0.1) * 0.06,
+                n * 0.16 + fbm(st*2.4 + cos(time * 0.21) * 0.1) * 0.08,
+                n * 0.13 + fbm(st*3.4 + sin(time * 0.16) * 0.1) * 0.07,
+                n * 0.15 + fbm(st*2.9 + cos(time * 0.24) * 0.1) * 0.09,
+                n * 0.12 + fbm(st*3.6 + sin(time * 0.18) * 0.1) * 0.08,
+                n * 0.16 + fbm(st*2.7 + cos(time * 0.22) * 0.1) * 0.07,
+                n * 0.14 + fbm(st*3.3 + sin(time * 0.2) * 0.1) * 0.06,
+                n * 0.13 + fbm(st*2.8 + cos(time * 0.17) * 0.1) * 0.08,
+                n * 0.15 + fbm(st*3.7 + sin(time * 0.23) * 0.1) * 0.07,
+                n * 0.12 + fbm(st*2.5 + cos(time * 0.19) * 0.1) * 0.09,
+                n * 0.16 + fbm(st*3.1 + sin(time * 0.21) * 0.1) * 0.08,
+                n * 0.14 + fbm(st*2.9 + cos(time * 0.18) * 0.1) * 0.07,
+                n * 0.13 + fbm(st*3.5 + sin(time * 0.24) * 0.1) * 0.06,
+                n * 0.15 + fbm(st*2.6 + cos(time * 0.2) * 0.1) * 0.08,
+                n * 0.12 + fbm(st*3.2 + sin(time * 0.22) * 0.1) * 0.07,
+                n * 0.16 + fbm(st*2.8 + cos(time * 0.17) * 0.1) * 0.09
             );
-
-            // Imperfection strengths adjusted for more organic look
+            
+            // Imperfection strengths for each variation
             float imperfectionStrength[24] = float[24](
-                0.15, 0.18, 0.14, 0.16, 0.13, 0.17,
-                0.16, 0.14, 0.17, 0.15, 0.18, 0.13,
-                0.16, 0.15, 0.17, 0.14, 0.16, 0.18,
-                0.15, 0.17, 0.14, 0.16, 0.15, 0.17
+                0.15, 0.18, 0.14, 0.16, 0.13, 0.17,  // First set
+                0.16, 0.14, 0.17, 0.15, 0.18, 0.13,  // Second set
+                0.16, 0.15, 0.17, 0.14, 0.16, 0.18,  // Third set
+                0.15, 0.17, 0.14, 0.16, 0.15, 0.17   // Fourth set
             );
             
             vec3 baseColor = colors[int(v)];
@@ -211,10 +236,13 @@ const concreteShader = {
         }
 
         void main() {
-            // Use world position for seamless texturing
+            // Use world position for seamless texturing with flow
             vec2 globalSt = vWorldPosition.xy / cubeSize * 8.0;
+            vec2 flow = flowNoise(globalSt, time) * 0.3;
+            globalSt += flow;
+            
             float n = fbm(globalSt);
-            float imp = fbm(globalSt * 4.0);
+            float imp = fbm(globalSt * 4.0 + flow);
             
             vec3 color = getVariationColor(variation, globalSt, n, imp);
             
@@ -245,14 +273,16 @@ for (let x = 0; x < SEGMENTS; x++) {
             // Add custom shader modifications
             material.onBeforeCompile = (shader) => {
                 // Add uniforms
-                shader.uniforms.variation = { value: Math.floor(Math.random() * 24) };
-                shader.uniforms.cubeSize = { value: CUBE_SIZE };
+                Object.assign(shader.uniforms, {
+                    time: { value: 0 },
+                    variation: { value: Math.floor(Math.random() * 24) },
+                    cubeSize: { value: CUBE_SIZE },
+                    mousePos: { value: new THREE.Vector2(0, 0) }
+                });
                 
-                // Add our custom functions before main
-                const customFunctions = concreteShader.fragmentShader
-                    .split('void main() {')[0]
-                    .replace(/uniform float variation;[\s\S]*?varying vec3 vWorldPosition;/, '');
-                
+                // Store shader reference for updates
+                material.userData.shader = shader;
+
                 // Add vWorldPosition to vertex shader declarations
                 shader.vertexShader = shader.vertexShader.replace(
                     '#include <common>',
@@ -266,15 +296,85 @@ for (let x = 0; x < SEGMENTS; x++) {
                     vec4 worldPosition = modelMatrix * vec4( position, 1.0 );
                     vWorldPosition = worldPosition.xyz;`
                 );
-                
-                // Add varyings and uniforms to fragment shader
-                shader.fragmentShader = shader.fragmentShader.replace(
-                    '#include <common>',
-                    `#include <common>
+
+                // Extract all function declarations from concrete shader
+                const functionDeclarations = `
+                    uniform float time;
                     uniform float variation;
                     uniform float cubeSize;
+                    uniform vec2 mousePos;
                     varying vec3 vWorldPosition;
-                    ${customFunctions}`
+
+                    // Arrays for colors and patterns
+                    vec3 colors[24] = vec3[24](
+                        vec3(0.067), vec3(0.045), vec3(0.058), vec3(0.042),
+                        vec3(0.049), vec3(0.054), vec3(0.061), vec3(0.043),
+                        vec3(0.056), vec3(0.040), vec3(0.047), vec3(0.055),
+                        vec3(0.063), vec3(0.039), vec3(0.048), vec3(0.052),
+                        vec3(0.046), vec3(0.041), vec3(0.050), vec3(0.044),
+                        vec3(0.057), vec3(0.038), vec3(0.052), vec3(0.053)
+                    );
+
+                    float imperfectionStrength[24] = float[24](
+                        0.15, 0.18, 0.14, 0.16, 0.13, 0.17,
+                        0.16, 0.14, 0.17, 0.15, 0.18, 0.13,
+                        0.16, 0.15, 0.17, 0.14, 0.16, 0.18,
+                        0.15, 0.17, 0.14, 0.16, 0.15, 0.17
+                    );
+
+                    float random(vec2 st) {
+                        return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
+                    }
+
+                    float noise(vec2 st) {
+                        vec2 i = floor(st);
+                        vec2 f = fract(st);
+                        float a = random(i);
+                        float b = random(i + vec2(1.0, 0.0));
+                        float c = random(i + vec2(0.0, 1.0));
+                        float d = random(i + vec2(1.0, 1.0));
+                        vec2 u = f * f * (3.0 - 2.0 * f);
+                        return mix(a, b, u.x) + (c - a)* u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+                    }
+
+                    vec2 flowNoise(vec2 st, float t) {
+                        float angle1 = noise(st + t * 0.1) * 6.28318;
+                        float angle2 = noise(st * 1.5 - t * 0.15) * 6.28318;
+                        vec2 flow1 = vec2(cos(angle1), sin(angle1));
+                        vec2 flow2 = vec2(cos(angle2), sin(angle2));
+                        vec2 mouseFlow = (mousePos - st) * 0.02;
+                        return flow1 * 0.3 + flow2 * 0.2 + mouseFlow;
+                    }
+
+                    float fbm(vec2 st) {
+                        float value = 0.0;
+                        float amplitude = 0.5;
+                        vec2 flow = flowNoise(st * 0.5, time);
+                        for(int i = 0; i < 5; i++) {
+                            vec2 flowedSt = st + flow * (float(i) * 0.1);
+                            value += amplitude * noise(flowedSt);
+                            st *= 2.0;
+                            amplitude *= 0.5;
+                        }
+                        return value;
+                    }
+
+                    vec3 getVariationColor(float v, vec2 st, float n, float imp) {
+                        vec2 flow = flowNoise(st, time);
+                        st += flow * 0.2;
+                        
+                        float pattern = n * 0.15 + fbm(st*2.0 + sin(time * 0.2) * 0.1) * 0.08;
+                        vec3 baseColor = colors[int(v)];
+                        vec3 color = baseColor + vec3(pattern - 0.075);
+                        color += vec3(imp * imperfectionStrength[int(v)]);
+                        return color;
+                    }
+                `;
+
+                // Add all declarations and functions to fragment shader
+                shader.fragmentShader = shader.fragmentShader.replace(
+                    '#include <common>',
+                    '#include <common>\n' + functionDeclarations
                 );
 
                 // Replace the color calculation
@@ -283,13 +383,13 @@ for (let x = 0; x < SEGMENTS; x++) {
                     `
                     #include <color_fragment>
                     vec2 globalSt = vWorldPosition.xy / cubeSize * 8.0;
+                    vec2 flow = flowNoise(globalSt, time) * 0.3;
+                    globalSt += flow;
                     float n = fbm(globalSt);
-                    float imp = fbm(globalSt * 4.0);
+                    float imp = fbm(globalSt * 4.0 + flow);
                     vec3 concreteColor = getVariationColor(variation, globalSt, n, imp);
-                    
                     float edgeEffect = pow(1.0 - abs(dot(normalize(vNormal), vec3(0.0, 0.0, 1.0))), 0.5) * 0.3;
                     concreteColor = mix(concreteColor, concreteColor * 0.8, edgeEffect);
-                    
                     diffuseColor.rgb *= concreteColor;
                     `
                 );
@@ -377,8 +477,16 @@ let isTransitioning = false;
 
 // Mouse event listeners
 function onMouseMove(event) {
+    // Update normalized mouse coordinates
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    
+    // Update shader uniform for all subcubes
+    subcubes.forEach((cube) => {
+        if (cube.material.userData.shader) {
+            cube.material.userData.shader.uniforms.mousePos.value.set(mouse.x, mouse.y);
+        }
+    });
     
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObjects(subcubes);
@@ -387,11 +495,9 @@ function onMouseMove(event) {
     
     if (isHovered && intersects[0]) {
         if (!wasHovered) {
-            // Start of hover - initialize positions
             lastIntersectPoint.copy(intersects[0].point);
             mouseIntersectPoint.copy(intersects[0].point);
         }
-        // Convert intersection point to local space
         targetIntersectPoint.copy(intersects[0].point);
         cubeGroup.worldToLocal(targetIntersectPoint);
         isTransitioning = true;
@@ -536,6 +642,13 @@ function animate() {
                 cube.userData.escapeDistance = Math.random() * 0.9 + 0.1; // Random distance between 1.0 and 2.0
                 activeCubes.add(cube);
             }
+        }
+    });
+
+    // Update time uniform for all subcubes
+    subcubes.forEach((cube) => {
+        if (cube.material.userData.shader) {
+            cube.material.userData.shader.uniforms.time.value = time;
         }
     });
 
