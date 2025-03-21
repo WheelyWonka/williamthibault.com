@@ -9,32 +9,50 @@ document.body.appendChild(renderer.domElement);
 
 // Room setup (gradient background)
 scene.background = new THREE.Color(0xf0f0f0);
-const roomGeometry = new THREE.BoxGeometry(100, 70, 100);
+const roomGeometry = new THREE.BoxGeometry(140, 90, 100);
 const roomMaterial = new THREE.MeshStandardMaterial({
     side: THREE.BackSide,
     color: 0x222222,
     metalness: 1,
-    roughness: 0.6
+    roughness: 0.5
 });
 const room = new THREE.Mesh(roomGeometry, roomMaterial);
 scene.add(room);
 
 // Moving light setup
-const light = new THREE.PointLight(0xffffff, 30000);
-light.position.set(
-    Math.random() * 100 - 50, // Random X between -50 and 50
-    Math.random() * 80 - 40,  // Random Y between -40 and 40
-    Math.random() * 20 - 10   // Random Z between -10 and 10
-);
+const light = new THREE.PointLight(0xffffff, 20000);
+// Generate random initial positions and movement parameters for first light
+const light1Config = {
+    basePos: {
+        x: (Math.random() - 0.5) * 120,  // Random X between -60 and 60
+        y: (Math.random() - 0.5) * 80,   // Random Y between -40 and 40
+        z: (Math.random() - 0.5) * 40    // Random Z between -20 and 20
+    },
+    movement: {
+        freqs: Array(5).fill(0).map(() => Math.random() * 0.2 + 0.05),  // Random frequencies between 0.05 and 0.25
+        amps: Array(5).fill(0).map(() => Math.random() * 20 + 10),      // Random amplitudes between 10 and 30
+        phases: Array(5).fill(0).map(() => Math.random() * Math.PI * 2)  // Random phase shifts
+    }
+};
+light.position.set(light1Config.basePos.x, light1Config.basePos.y, light1Config.basePos.z);
 scene.add(light);
 
 // Second moving light
-const light2 = new THREE.PointLight(0xffffff, 30000);
-light2.position.set(
-    -(Math.random() * 100 - 50), // Opposite side X between -50 and 50
-    -(Math.random() * 80 - 40),  // Opposite side Y between -40 and 40
-    Math.random() * 20 + 10      // Random Z between 10 and 30
-);
+const light2 = new THREE.PointLight(0xffffff, 20000);
+// Generate different random parameters for second light
+const light2Config = {
+    basePos: {
+        x: (Math.random() - 0.5) * 120,  // Different random range
+        y: (Math.random() - 0.5) * 80,
+        z: Math.random() * 40 + 20       // Keep it behind first light
+    },
+    movement: {
+        freqs: Array(5).fill(0).map(() => Math.random() * 0.2 + 0.05),  // Different random frequencies
+        amps: Array(5).fill(0).map(() => Math.random() * 20 + 10),      // Different random amplitudes
+        phases: Array(5).fill(0).map(() => Math.random() * Math.PI * 2)  // Different random phases
+    }
+};
+light2.position.set(light2Config.basePos.x, light2Config.basePos.y, light2Config.basePos.z);
 scene.add(light2);
 
 // Ambient light for better visibility
@@ -374,38 +392,26 @@ function animate() {
         ZOOM_SMOOTHNESS
     );
 
-    // Animate light positions - always behind camera
-    const lightOffset = 20; // Distance behind camera
+    // Animate light positions with random patterns
+    const lightOffset = 20;
+    
+    // First light movement using random parameters
+    light.position.x = light1Config.basePos.x;
+    light.position.y = light1Config.basePos.y;
+    for (let i = 0; i < 5; i++) {
+        light.position.x += Math.sin(time * light1Config.movement.freqs[i] + light1Config.movement.phases[i]) * light1Config.movement.amps[i];
+        light.position.y += Math.cos(time * light1Config.movement.freqs[i] + light1Config.movement.phases[i]) * light1Config.movement.amps[i];
+    }
     light.position.z = camera.position.z + lightOffset;
-    light2.position.z = camera.position.z + lightOffset + 15; // Slightly further back
 
-    // First light movement - wide pattern but within scene bounds
-    light.position.x = 
-        Math.sin(time * 0.1) * 30 + // Reduced from 80
-        Math.sin(time * 0.05) * 20 + // Reduced from 60
-        Math.sin(time * 0.15) * 15 + // Reduced from 40
-        Math.sin(time * 0.22) * 10 + // Reduced from 30
-        Math.sin(time * 0.31) * 5;   // Reduced from 20
-    light.position.y = 
-        Math.cos(time * 0.08) * 25 + // Reduced from 70
-        Math.cos(time * 0.04) * 20 + // Reduced from 50
-        Math.cos(time * 0.12) * 15 + // Reduced from 35
-        Math.cos(time * 0.19) * 10 + // Reduced from 25
-        Math.cos(time * 0.27) * 5;   // Reduced from 15
-
-    // Second light movement - different pattern, opposite direction
-    light2.position.x = 
-        -Math.sin(time * 0.17) * 35 + // Reduced from 100
-        -Math.sin(time * 0.09) * 25 + // Reduced from 80
-        -Math.sin(time * 0.25) * 20 + // Reduced from 60
-        -Math.sin(time * 0.33) * 15 + // Reduced from 40
-        -Math.sin(time * 0.41) * 10;  // Reduced from 30
-    light2.position.y = 
-        -Math.cos(time * 0.13) * 30 + // Reduced from 90
-        -Math.cos(time * 0.07) * 25 + // Reduced from 70
-        -Math.cos(time * 0.21) * 20 + // Reduced from 50
-        -Math.cos(time * 0.29) * 15 + // Reduced from 35
-        -Math.cos(time * 0.37) * 10;  // Reduced from 25
+    // Second light movement using different random parameters
+    light2.position.x = light2Config.basePos.x;
+    light2.position.y = light2Config.basePos.y;
+    for (let i = 0; i < 5; i++) {
+        light2.position.x += Math.sin(time * light2Config.movement.freqs[i] + light2Config.movement.phases[i]) * light2Config.movement.amps[i];
+        light2.position.y += Math.cos(time * light2Config.movement.freqs[i] + light2Config.movement.phases[i]) * light2Config.movement.amps[i];
+    }
+    light2.position.z = camera.position.z + lightOffset + 15;
 
     // Smooth mouse intersection point movement
     if (isTransitioning) {
