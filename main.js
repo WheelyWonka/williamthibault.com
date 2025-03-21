@@ -7,9 +7,21 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
+// Room setup (gradient background)
+scene.background = new THREE.Color(0xf0f0f0);
+const roomGeometry = new THREE.BoxGeometry(70, 70, 100);
+const roomMaterial = new THREE.MeshStandardMaterial({
+    side: THREE.BackSide,
+    color: 0x333333,
+    metalness: 0.1,
+    roughness: 0.8
+});
+const room = new THREE.Mesh(roomGeometry, roomMaterial);
+scene.add(room);
+
 // Moving light setup
 const light = new THREE.PointLight(0xffffff, 5000);
-light.position.set(0, 2, 5);
+light.position.set(0, 2, 3);
 scene.add(light);
 
 // Ambient light for better visibility
@@ -273,9 +285,6 @@ for (let x = 0; x < SEGMENTS; x++) {
 scene.add(cubeGroup);
 camera.position.z = 20;
 
-// Room setup (gradient background)
-scene.background = new THREE.Color(0xf0f0f0);
-
 // Cube position limits and zoom settings
 const MIN_DISTANCE = 0.001;
 const MAX_DISTANCE = 30;
@@ -355,8 +364,20 @@ function animate() {
     // Animate light position - always behind camera
     const lightOffset = 5; // Distance behind camera
     light.position.z = camera.position.z + lightOffset;
-    light.position.x = Math.sin(time * 0.5) * 4;
-    light.position.y = Math.cos(time * 0.3) * 3 + 2;
+    // Combine multiple sine waves for more dynamic random-looking movement
+    light.position.x = 
+        Math.sin(time * 0.2) * 8 + // Larger primary movement range
+        Math.sin(time * 0.1) * 5 + // Larger secondary movement range
+        Math.sin(time * 0.33) * 3 + // More pronounced faster variation
+        Math.sin(time * 0.47) * 2 + // More pronounced complexity
+        Math.sin(time * 0.71) * 1.5; // Added fifth frequency for extra movement
+    light.position.y = 
+        Math.cos(time * 0.15) * 7 + // Larger primary movement range
+        Math.cos(time * 0.08) * 5 + // Larger secondary movement range
+        Math.cos(time * 0.27) * 3 + // More pronounced faster variation
+        Math.cos(time * 0.41) * 2 + // More pronounced complexity
+        Math.cos(time * 0.63) * 1.5 + // Added fifth frequency for extra movement
+        4; // Higher base height offset
 
     // Smooth mouse intersection point movement
     if (isTransitioning) {
