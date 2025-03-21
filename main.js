@@ -66,33 +66,74 @@ const concreteShader = {
         }
 
         vec3 getVariationColor(float v, vec2 st, float n, float imp) {
-            // Base colors for each variation
-            vec3 colors[6] = vec3[6](
-                vec3(0.267, 0.267, 0.267),  // Classic grey
-                vec3(0.25, 0.23, 0.21),     // Brownish
-                vec3(0.28, 0.28, 0.30),     // Bluish grey
-                vec3(0.22, 0.24, 0.23),     // Greenish
-                vec3(0.29, 0.27, 0.25),     // Warm grey
-                vec3(0.24, 0.25, 0.27)      // Cool grey
+            // Base colors for each variation (24 variations total)
+            vec3 colors[24] = vec3[24](
+                // All greys made much darker
+                vec3(0.067, 0.067, 0.067),  // Dark grey 1
+                vec3(0.045, 0.045, 0.045),  // Dark grey 2
+                vec3(0.058, 0.058, 0.058),  // Dark grey 3
+                vec3(0.042, 0.042, 0.042),  // Dark grey 4
+                vec3(0.049, 0.049, 0.049),  // Dark grey 5
+                vec3(0.054, 0.054, 0.054),  // Dark grey 6
+                vec3(0.061, 0.061, 0.061),  // Dark grey 7
+                vec3(0.043, 0.043, 0.043),  // Dark grey 8
+                vec3(0.056, 0.056, 0.056),  // Dark grey 9
+                vec3(0.040, 0.040, 0.040),  // Dark grey 10
+                vec3(0.047, 0.047, 0.047),  // Dark grey 11
+                vec3(0.055, 0.055, 0.055),  // Dark grey 12
+                vec3(0.063, 0.063, 0.063),  // Dark grey 13
+                vec3(0.039, 0.039, 0.039),  // Dark grey 14
+                vec3(0.048, 0.048, 0.048),  // Dark grey 15
+                vec3(0.052, 0.052, 0.052),  // Dark grey 16
+                vec3(0.046, 0.046, 0.046),  // Dark grey 17
+                vec3(0.041, 0.041, 0.041),  // Dark grey 18
+                vec3(0.050, 0.050, 0.050),  // Dark grey 19
+                vec3(0.044, 0.044, 0.044),  // Dark grey 20
+                vec3(0.057, 0.057, 0.057),  // Dark grey 21
+                vec3(0.038, 0.038, 0.038),  // Dark grey 22
+                vec3(0.052, 0.052, 0.052),  // Dark grey 23
+                vec3(0.053, 0.053, 0.053)   // Dark grey 24
             );
 
-            // Pattern variations
-            float patterns[6] = float[6](
-                n * 0.15,                    // Standard noise
-                n * 0.2 + sin(st.x*10.0) * 0.05,  // Striated
-                n * 0.12 + fbm(st*2.0) * 0.08,    // Double noise
-                n * 0.18 + cos(st.y*8.0) * 0.04,  // Horizontal lines
-                n * 0.15 + sin(st.x*6.0 + st.y*6.0) * 0.06, // Diagonal pattern
-                n * 0.1 + fbm(st*3.0) * 0.1       // Heavy noise
+            // Pattern variations (24 variations) - only organic concrete-like textures
+            float patterns[24] = float[24](
+                // All patterns modified to be organic, no stripes or geometric patterns
+                n * 0.15 + fbm(st*2.0) * 0.08,    // Basic concrete
+                n * 0.12 + fbm(st*3.0) * 0.1,     // Rough concrete
+                n * 0.14 + fbm(st*2.5) * 0.09,    // Medium concrete
+                n * 0.16 + fbm(st*3.5) * 0.07,    // Coarse concrete
+                n * 0.13 + fbm(st*4.0) * 0.06,    // Fine concrete
+                n * 0.17 + fbm(st*2.8) * 0.08,    // Porous concrete
+                n * 0.11 + fbm(st*3.2) * 0.09,    // Dense concrete
+                n * 0.15 + fbm(st*2.6) * 0.07,    // Smooth concrete
+                n * 0.14 + fbm(st*3.8) * 0.06,    // Weathered concrete
+                n * 0.16 + fbm(st*2.4) * 0.08,    // Aged concrete
+                n * 0.13 + fbm(st*3.4) * 0.07,    // Textured concrete
+                n * 0.15 + fbm(st*2.9) * 0.09,    // Grainy concrete
+                n * 0.12 + fbm(st*3.6) * 0.08,    // Mottled concrete
+                n * 0.16 + fbm(st*2.7) * 0.07,    // Speckled concrete
+                n * 0.14 + fbm(st*3.3) * 0.06,    // Eroded concrete
+                n * 0.13 + fbm(st*2.8) * 0.08,    // Pitted concrete
+                n * 0.15 + fbm(st*3.7) * 0.07,    // Worn concrete
+                n * 0.12 + fbm(st*2.5) * 0.09,    // Raw concrete
+                n * 0.16 + fbm(st*3.1) * 0.08,    // Natural concrete
+                n * 0.14 + fbm(st*2.9) * 0.07,    // Organic concrete
+                n * 0.13 + fbm(st*3.5) * 0.06,    // Uneven concrete
+                n * 0.15 + fbm(st*2.6) * 0.08,    // Distressed concrete
+                n * 0.12 + fbm(st*3.2) * 0.07,    // Irregular concrete
+                n * 0.16 + fbm(st*2.8) * 0.09     // Rough-hewn concrete
             );
 
+            // Imperfection strengths adjusted for more organic look
+            float imperfectionStrength[24] = float[24](
+                0.15, 0.18, 0.14, 0.16, 0.13, 0.17,
+                0.16, 0.14, 0.17, 0.15, 0.18, 0.13,
+                0.16, 0.15, 0.17, 0.14, 0.16, 0.18,
+                0.15, 0.17, 0.14, 0.16, 0.15, 0.17
+            );
+            
             vec3 baseColor = colors[int(v)];
             float pattern = patterns[int(v)];
-            
-            // Add variation-specific imperfections
-            float imperfectionStrength[6] = float[6](
-                0.1, 0.15, 0.08, 0.12, 0.14, 0.11
-            );
             
             vec3 color = baseColor + vec3(pattern - 0.075);
             color += vec3(imp * imperfectionStrength[int(v)]);
@@ -164,7 +205,7 @@ for (let x = 0; x < SEGMENTS; x++) {
             // Add custom shader modifications
             material.onBeforeCompile = (shader) => {
                 // Add uniforms
-                shader.uniforms.variation = { value: Math.floor(Math.random() * 6) };
+                shader.uniforms.variation = { value: Math.floor(Math.random() * 24) };
                 
                 // Add our custom functions before main
                 const customFunctions = concreteShader.fragmentShader
