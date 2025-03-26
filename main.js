@@ -502,14 +502,87 @@ function onMouseWheel(event) {
 
 window.addEventListener('wheel', onMouseWheel);
 
-// Raycaster for mouse interaction
-const raycaster = new THREE.Raycaster();
+// Mouse movement tracking
 const mouse = new THREE.Vector2();
 let isHovered = false;
 let mouseIntersectPoint = new THREE.Vector3();
 let targetIntersectPoint = new THREE.Vector3();
 let lastIntersectPoint = new THREE.Vector3();
 let isTransitioning = false;
+
+// Handle both mouse and touch movement
+function updateMousePosition(event) {
+    // For touch events, use the first touch point
+    const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+    const clientY = event.touches ? event.touches[0].clientY : event.clientY;
+    
+    // Calculate normalized coordinates (-1 to 1)
+    mouse.x = (clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+
+    // Update camera rotation targets based on mouse position
+    targetCameraRotationY = mouse.x * PARALLAX_STRENGTH;
+    targetCameraRotationX = -mouse.y * PARALLAX_STRENGTH;
+    
+    // Update shader uniform for all subcubes
+    subcubes.forEach((cube) => {
+        if (cube.material.userData.shader) {
+            cube.material.userData.shader.uniforms.mousePos.value.set(mouse.x, mouse.y);
+        }
+    });
+    
+    // Update raycaster and check intersections
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(subcubes);
+    const wasHovered = isHovered;
+    isHovered = intersects.length > 0;
+    
+    if (isHovered && intersects[0]) {
+        if (!wasHovered) {
+            lastIntersectPoint.copy(intersects[0].point);
+            mouseIntersectPoint.copy(intersects[0].point);
+        }
+        targetIntersectPoint.copy(intersects[0].point);
+        cubeGroup.worldToLocal(targetIntersectPoint);
+        isTransitioning = true;
+    }
+
+    // Update contact info position with parallax
+    const parallaxX = (mouse.x * CONTACT_PARALLAX_STRENGTH);
+    const parallaxY = (mouse.y * CONTACT_PARALLAX_STRENGTH);
+    document.getElementById('contact-info').style.transform = `translate(${parallaxX}px, ${-parallaxY}px)`;
+}
+
+// Reset position when touch/mouse leaves
+function resetPosition() {
+    mouse.x = 0;
+    mouse.y = 0;
+    targetCameraRotationX = 0;
+    targetCameraRotationY = 0;
+    isHovered = false;
+    document.getElementById('contact-info').style.transform = 'translate(0px, 0px)';
+}
+
+// Add both mouse and touch event listeners
+window.addEventListener('mousemove', updateMousePosition);
+window.addEventListener('touchmove', (e) => {
+    e.preventDefault(); // Prevent scrolling
+    updateMousePosition(e);
+}, { passive: false });
+
+window.addEventListener('touchstart', (e) => {
+    e.preventDefault(); // Prevent scrolling
+    updateMousePosition(e);
+}, { passive: false });
+
+window.addEventListener('mouseleave', resetPosition);
+window.addEventListener('touchend', resetPosition);
+
+// Remove old event listeners
+window.removeEventListener('mousemove', onMouseMove);
+
+// Raycaster for mouse interaction
+const raycaster = new THREE.Raycaster();
 
 // Mouse event listeners
 function onMouseMove(event) {
