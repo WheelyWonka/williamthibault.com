@@ -11,55 +11,78 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
 // Room setup (gradient background)
-scene.background = new THREE.Color(0xf0f0f0);
-const roomGeometry = new THREE.BoxGeometry(140, 90, 100);
+scene.background = new THREE.Color(0x000000); // Darker background
+const roomGeometry = new THREE.BoxGeometry(100, 100, 100);
 const roomMaterial = new THREE.MeshStandardMaterial({
     side: THREE.BackSide,
-    color: 0x222222,
-    metalness: 1,
-    roughness: 0.5
+    color: 0x000000,
+    metalness: .5,  // More metallic for better reflections
+    roughness: 1,  // Less rough for clearer reflections
+    envMapIntensity: 0  // Enhance reflection intensity
 });
 const room = new THREE.Mesh(roomGeometry, roomMaterial);
 scene.add(room);
 
-// Moving light setup
-const light = new THREE.PointLight(0xffffff, 20000);
+// After room creation, add room rotation configuration
+const roomRotationConfig = {
+    freqs: {
+        x: Math.random() * 0.2 + 0.1, // Keep same speed
+        y: Math.random() * 0.15 + 0.08,
+        z: Math.random() * 0.1 + 0.05
+    },
+    amps: {
+        x: Math.random() * 0.3 + 0.2, // Increased from 0.08 to 0.3
+        y: Math.random() * 0.3 + 0.2, // Increased from 0.08 to 0.3
+        z: Math.random() * 0.2 + 0.1  // Increased from 0.06 to 0.2
+    },
+    phases: {
+        x: Math.random() * Math.PI * 2,
+        y: Math.random() * Math.PI * 2,
+        z: Math.random() * Math.PI * 2
+    }
+};
+
+// Moving light setup with improved parameters
+const light = new THREE.PointLight(0xffffff, 3000);
+light.distance = 150;
+light.decay = 1.5;
 // Generate random initial positions and movement parameters for first light
 const light1Config = {
     basePos: {
-        x: (Math.random() - 0.5) * 120,  // Random X between -60 and 60
-        y: (Math.random() - 0.5) * 80,   // Random Y between -40 and 40
-        z: (Math.random() - 0.5) * 40    // Random Z between -20 and 20
+        x: (Math.random() - 0.5) * 40,  // Reduced from 80 to stay in room
+        y: (Math.random() - 0.5) * 40,  // Reduced from 60 to stay in room
+        z: (Math.random() - 0.5) * 40   // Reduced from 60 to stay in room
     },
     movement: {
-        freqs: Array(5).fill(0).map(() => Math.random() * 0.2 + 0.05),  // Random frequencies between 0.05 and 0.25
-        amps: Array(5).fill(0).map(() => Math.random() * 20 + 10),      // Random amplitudes between 10 and 30
-        phases: Array(5).fill(0).map(() => Math.random() * Math.PI * 2)  // Random phase shifts
+        freqs: Array(5).fill(0).map(() => Math.random() * 0.2 + 0.05),
+        amps: Array(5).fill(0).map(() => Math.random() * 8 + 5),  // Reduced from 15+10 to 8+5
+        phases: Array(5).fill(0).map(() => Math.random() * Math.PI * 2)
     }
 };
 light.position.set(light1Config.basePos.x, light1Config.basePos.y, light1Config.basePos.z);
 scene.add(light);
 
-// Second moving light
-const light2 = new THREE.PointLight(0xffffff, 20000);
-// Generate different random parameters for second light
+// Second moving light with different parameters
+const light2 = new THREE.PointLight(0xffffff, 3000);
+light2.distance = 150;
+light2.decay = 1.5;
 const light2Config = {
     basePos: {
-        x: (Math.random() - 0.5) * 120,  // Different random range
-        y: (Math.random() - 0.5) * 80,
-        z: Math.random() * 40 + 20       // Keep it behind first light
+        x: (Math.random() - 0.5) * 40,  // Reduced from 80 to stay in room
+        y: (Math.random() - 0.5) * 40,  // Reduced from 60 to stay in room
+        z: (Math.random() - 0.5) * 40   // Reduced from 60 to stay in room
     },
     movement: {
-        freqs: Array(5).fill(0).map(() => Math.random() * 0.2 + 0.05),  // Different random frequencies
-        amps: Array(5).fill(0).map(() => Math.random() * 20 + 10),      // Different random amplitudes
-        phases: Array(5).fill(0).map(() => Math.random() * Math.PI * 2)  // Different random phases
+        freqs: Array(5).fill(0).map(() => Math.random() * 0.2 + 0.05),
+        amps: Array(5).fill(0).map(() => Math.random() * 8 + 5),  // Reduced from 15+10 to 8+5
+        phases: Array(5).fill(0).map(() => Math.random() * Math.PI * 2)
     }
 };
 light2.position.set(light2Config.basePos.x, light2Config.basePos.y, light2Config.basePos.z);
 scene.add(light2);
 
-// Ambient light for better visibility
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+// Ambient light for better base visibility
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.2); // Reduced ambient light
 scene.add(ambientLight);
 
 // Define cube size constant first
@@ -561,20 +584,30 @@ function animate() {
     // First light movement using random parameters
     light.position.x = light1Config.basePos.x;
     light.position.y = light1Config.basePos.y;
+    light.position.z = light1Config.basePos.z;
     for (let i = 0; i < 5; i++) {
         light.position.x += Math.sin(time * light1Config.movement.freqs[i] + light1Config.movement.phases[i]) * light1Config.movement.amps[i];
         light.position.y += Math.cos(time * light1Config.movement.freqs[i] + light1Config.movement.phases[i]) * light1Config.movement.amps[i];
+        light.position.z += Math.sin(time * light1Config.movement.freqs[i] + light1Config.movement.phases[i] * 0.7) * light1Config.movement.amps[i] * 0.5;
     }
-    light.position.z = camera.position.z + lightOffset;
+    // Clamp light position to room boundaries
+    light.position.x = Math.max(-45, Math.min(45, light.position.x));
+    light.position.y = Math.max(-45, Math.min(45, light.position.y));
+    light.position.z = Math.max(-45, Math.min(45, light.position.z));
 
     // Second light movement using different random parameters
     light2.position.x = light2Config.basePos.x;
     light2.position.y = light2Config.basePos.y;
+    light2.position.z = light2Config.basePos.z;
     for (let i = 0; i < 5; i++) {
         light2.position.x += Math.sin(time * light2Config.movement.freqs[i] + light2Config.movement.phases[i]) * light2Config.movement.amps[i];
         light2.position.y += Math.cos(time * light2Config.movement.freqs[i] + light2Config.movement.phases[i]) * light2Config.movement.amps[i];
+        light2.position.z += Math.cos(time * light2Config.movement.freqs[i] + light2Config.movement.phases[i] * 0.7) * light2Config.movement.amps[i] * 0.5;
     }
-    light2.position.z = camera.position.z + lightOffset + 15;
+    // Clamp light position to room boundaries
+    light2.position.x = Math.max(-45, Math.min(45, light2.position.x));
+    light2.position.y = Math.max(-45, Math.min(45, light2.position.y));
+    light2.position.z = Math.max(-45, Math.min(45, light2.position.z));
 
     // Smooth mouse intersection point movement
     if (isTransitioning) {
@@ -691,6 +724,11 @@ function animate() {
             cube.material.userData.shader.uniforms.time.value = time;
         }
     });
+
+    // Room rotation animation
+    room.rotation.x = Math.sin(time * roomRotationConfig.freqs.x + roomRotationConfig.phases.x) * roomRotationConfig.amps.x;
+    room.rotation.y = Math.sin(time * roomRotationConfig.freqs.y + roomRotationConfig.phases.y) * roomRotationConfig.amps.y;
+    room.rotation.z = Math.sin(time * roomRotationConfig.freqs.z + roomRotationConfig.phases.z) * roomRotationConfig.amps.z;
 
     renderer.render(scene, camera);
 }
