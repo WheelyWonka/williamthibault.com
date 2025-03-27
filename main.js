@@ -639,20 +639,27 @@ window.addEventListener('resize', () => {
 
 // Animation
 let time = 0;
-function animate() {
+let lastTime = 0;
+function animate(currentTime) {
     requestAnimationFrame(animate);
-    time += 0.01;
+    
+    // Calculate delta time in seconds
+    const deltaTime = (currentTime - lastTime) / 1000;
+    lastTime = currentTime;
+    
+    // Update time with deltaTime
+    time += deltaTime;
 
     // Smooth zoom interpolation
     cubeGroup.position.z = THREE.MathUtils.lerp(
         cubeGroup.position.z,
         targetZPosition,
-        ZOOM_SMOOTHNESS
+        ZOOM_SMOOTHNESS * deltaTime * 60 // Normalize to 60fps
     );
 
     // Smooth camera rotation interpolation
-    currentCameraRotationX = THREE.MathUtils.lerp(currentCameraRotationX, targetCameraRotationX, 0.05);
-    currentCameraRotationY = THREE.MathUtils.lerp(currentCameraRotationY, targetCameraRotationY, 0.05);
+    currentCameraRotationX = THREE.MathUtils.lerp(currentCameraRotationX, targetCameraRotationX, 0.05 * deltaTime * 60);
+    currentCameraRotationY = THREE.MathUtils.lerp(currentCameraRotationY, targetCameraRotationY, 0.05 * deltaTime * 60);
     
     camera.rotation.x = currentCameraRotationX;
     camera.rotation.y = currentCameraRotationY;
@@ -690,17 +697,17 @@ function animate() {
 
     // Smooth mouse intersection point movement
     if (isTransitioning) {
-        mouseIntersectPoint.lerp(targetIntersectPoint, 0.1);
+        mouseIntersectPoint.lerp(targetIntersectPoint, 0.1 * deltaTime * 60);
     }
 
     // Rotate entire cube group only when not hovered
     if (!isHovered) {
-        cubeGroup.rotation.x += 0.001;
-        cubeGroup.rotation.y += 0.002;
+        cubeGroup.rotation.x += 0.001 * deltaTime * 60;
+        cubeGroup.rotation.y += 0.002 * deltaTime * 60;
     }
 
-    // Update heartbeat timing
-    heartbeatTime += 0.016;
+    // Update heartbeat timing with deltaTime
+    heartbeatTime += deltaTime;
     
     // Check if we need to generate a new cycle duration
     if (heartbeatTime >= currentCycleDuration) {
@@ -740,18 +747,18 @@ function animate() {
                     cube.userData.originalPosition.z + direction.z * explodeStrength
                 );
                 
-                cube.position.lerp(targetPosition, 0.15);
+                cube.position.lerp(targetPosition, 0.15 * deltaTime * 60);
                 
                 // Reset alive state when hovered
                 cube.userData.isAlive = false;
                 activeCubes.delete(cube);
             } else {
-                cube.position.lerp(cube.userData.originalPosition, 0.15);
+                cube.position.lerp(cube.userData.originalPosition, 0.15 * deltaTime * 60);
             }
         } else {
             // Handle "alive" animation
             if (cube.userData.isAlive) {
-                cube.userData.aliveTime += 0.016;
+                cube.userData.aliveTime += deltaTime;
                 
                 // Calculate direction from center
                 const directionFromCenter = cube.userData.originalPosition.clone().normalize();
@@ -774,8 +781,8 @@ function animate() {
                 
                 // Quick outward movement, slower return
                 const lerpSpeed = heartbeatStrength > 0.1 ? 
-                    0.5 + cube.userData.randomOffset.y * 0.2 : // Random variation in outward speed
-                    0.15 + cube.userData.randomOffset.z * 0.05; // Random variation in return speed
+                    (0.5 + cube.userData.randomOffset.y * 0.2) * deltaTime * 60 : // Random variation in outward speed
+                    (0.15 + cube.userData.randomOffset.z * 0.05) * deltaTime * 60; // Random variation in return speed
                 
                 cube.position.lerp(targetPosition, lerpSpeed);
                 
@@ -785,7 +792,7 @@ function animate() {
                 }
             } else {
                 // Return to original position
-                cube.position.lerp(cube.userData.originalPosition, 0.15);
+                cube.position.lerp(cube.userData.originalPosition, 0.15 * deltaTime * 60);
             }
 
             // Activate all cubes for unified beating
@@ -812,7 +819,7 @@ function animate() {
     renderer.render(scene, camera);
 }
 
-animate();
+animate(0);
 
 // Add event listeners to stop propagation on contact info
 const contactInfo = document.getElementById('contact-info');
