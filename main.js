@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 // Add variables for contact info parallax
 const CONTACT_PARALLAX_STRENGTH = 15; // Pixels of movement
+const isTouchDevice = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 
 // Scene setup
 const scene = new THREE.Scene();
@@ -547,10 +548,12 @@ function updateMousePosition(event) {
         isTransitioning = true;
     }
 
-    // Update contact info position with parallax
-    const parallaxX = (mouse.x * CONTACT_PARALLAX_STRENGTH);
-    const parallaxY = (mouse.y * CONTACT_PARALLAX_STRENGTH);
-    document.getElementById('contact-info').style.transform = `translate(${parallaxX}px, ${-parallaxY}px)`;
+    // Update contact info position with parallax only on desktop
+    if (!isTouchDevice) {
+        const parallaxX = (mouse.x * CONTACT_PARALLAX_STRENGTH);
+        const parallaxY = (mouse.y * CONTACT_PARALLAX_STRENGTH);
+        document.getElementById('contact-info').style.transform = `translate(${parallaxX}px, ${-parallaxY}px)`;
+    }
 }
 
 // Reset position when touch/mouse leaves
@@ -560,7 +563,9 @@ function resetPosition() {
     targetCameraRotationX = 0;
     targetCameraRotationY = 0;
     isHovered = false;
-    document.getElementById('contact-info').style.transform = 'translate(0px, 0px)';
+    if (!isTouchDevice) {
+        document.getElementById('contact-info').style.transform = 'translate(0px, 0px)';
+    }
 }
 
 // Add both mouse and touch event listeners
