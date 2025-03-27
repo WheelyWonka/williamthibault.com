@@ -591,6 +591,7 @@ const raycaster = new THREE.Raycaster();
 
 // Mouse event listeners
 function onMouseMove(event) {
+    console.log("onMouseMove");
     // Update normalized mouse coordinates
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -811,4 +812,13 @@ function animate() {
     renderer.render(scene, camera);
 }
 
-animate(); 
+animate();
+
+// Add event listeners to stop propagation on contact info
+const contactInfo = document.getElementById('contact-info');
+
+['mousemove', 'click', 'touch', 'touchstart', 'touchmove', 'touchend'].forEach(eventType => {
+    contactInfo.addEventListener(eventType, (e) => {
+        e.stopPropagation();
+    }, { passive: true });
+});
